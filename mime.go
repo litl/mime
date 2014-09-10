@@ -69,7 +69,7 @@ func (mimeType *Type) Scan(value interface{}) error {
 	case []byte:
 		*mimeType = Type(value.([]byte))
 	default:
-		return fmt.Errorf("Unable to convert %+v to ServerMediaId", value)
+		return fmt.Errorf("Unable to convert %+v to Type", value)
 	}
 
 	return nil
