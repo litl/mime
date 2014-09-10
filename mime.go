@@ -17,6 +17,7 @@ func init() {
 	mime.AddExtensionType(".orf", string(TypeRawOlympusORF))
 	mime.AddExtensionType(".arf", string(TypeRawSonyRaw))
 
+	mime.AddExtensionType(".3gp", string(Type3GPP))
 	mime.AddExtensionType(".avi", string(TypeAVI))
 	mime.AddExtensionType(".flv", string(TypeFlashVideo))
 	mime.AddExtensionType(".mkv", string(TypeMatroska))
@@ -46,6 +47,7 @@ const (
 	TypeRawSonyRaw    = "image/x-sony-raw"
 
 	// video
+	Type3GPP              Type = "video/3gpp"
 	TypeAVI               Type = "video/avi"
 	TypeFlashVideo        Type = "video/x-flv"
 	TypeMatroska          Type = "video/x-matroska"
@@ -67,7 +69,7 @@ func (mimeType *Type) Scan(value interface{}) error {
 	case []byte:
 		*mimeType = Type(value.([]byte))
 	default:
-		return fmt.Errorf("Unable to convert %+v to ServerMediaId", value)
+		return fmt.Errorf("Unable to convert %+v to Type", value)
 	}
 
 	return nil
@@ -96,6 +98,8 @@ func (mimeType Type) DefaultExtension() string {
 	case TypeRawSonyRaw:
 		return "raw"
 
+	case Type3GPP:
+		return "3gp"
 	case TypeAVI:
 		return "avi"
 	case TypeFlashVideo:
