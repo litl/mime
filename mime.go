@@ -3,41 +3,18 @@ package mime
 import (
 	"database/sql/driver"
 	"fmt"
+	"log"
 	"mime"
+	"strings"
 )
-
-func init() {
-	mime.AddExtensionType(".jpeg", string(TypeJPEG))
-	mime.AddExtensionType(".jpg", string(TypeJPEG))
-	mime.AddExtensionType(".png", string(TypePNG))
-
-	mime.AddExtensionType(".cr2", string(TypeRawCanonCR2))
-	mime.AddExtensionType(".nef", string(TypeRawNikonNEF))
-	mime.AddExtensionType(".rw2", string(TypeRawRW2))
-	mime.AddExtensionType(".orf", string(TypeRawOlympusORF))
-	mime.AddExtensionType(".arf", string(TypeRawSonyRaw))
-
-	mime.AddExtensionType(".3gp", string(Type3GPP))
-	mime.AddExtensionType(".avi", string(TypeAVI))
-	mime.AddExtensionType(".flv", string(TypeFlashVideo))
-	mime.AddExtensionType(".mkv", string(TypeMatroska))
-	mime.AddExtensionType(".m4v", string(TypeMP4))
-	mime.AddExtensionType(".mp4", string(TypeMP4))
-	mime.AddExtensionType(".mpeg", string(TypeMPEG))
-	mime.AddExtensionType(".mpg", string(TypeMPEG))
-	mime.AddExtensionType(".m2ts", string(TypeMPEG2TS))
-	mime.AddExtensionType(".mts", string(TypeMPEG2TS))
-	mime.AddExtensionType(".ogv", string(TypeOGG))
-	mime.AddExtensionType(".mov", string(TypeQuickTime))
-	mime.AddExtensionType(".webm", string(TypeWebM))
-	mime.AddExtensionType(".wmv", string(TypeWindowsMediaVideo))
-}
 
 type Type string
 
 const (
 	TypeJPEG Type = "image/jpeg"
 	TypePNG  Type = "image/png"
+	TypeGIF  Type = "image/gif"
+	TypeBMP  Type = "image/x-ms-bmp"
 
 	// raw photos
 	TypeRawCanonCR2   = "image/x-canon-cr2"
@@ -60,6 +37,60 @@ const (
 	TypeWindowsMediaVideo Type = "video/x-ms-wmv"
 )
 
+var (
+	ext2mime map[string]Type = make(map[string]Type)
+	mime2ext map[Type]string = make(map[Type]string)
+)
+
+// Adds a mimetype and extension to reverse lookup maps, and registers the
+// extension with mime db.  Subsequent registration of (mimetype, extension)
+// will overwrite previous ones.  Multiple extensions may be passed, the
+// first one will be the default extension for that mimetype.
+func registerMimetypeExt(mimeType Type, ext string, extras ...string) {
+	if _, ok := mime2ext[mimeType]; ok {
+		log.Panicf("Mimetype %s already registered", mimeType)
+	}
+
+	ext = strings.ToLower(ext)
+	mime2ext[mimeType] = ext
+
+	registerExtraMimetypeExt(mimeType, ext)
+	for _, ext := range extras {
+		registerExtraMimetypeExt(mimeType, ext)
+	}
+}
+
+func registerExtraMimetypeExt(mimeType Type, ext string) {
+	ext = strings.ToLower(ext)
+	ext2mime[ext] = mimeType
+	mime.AddExtensionType("."+ext, string(mimeType))
+}
+
+func init() {
+	registerMimetypeExt(TypeJPEG, "jpg", "jpeg")
+	registerMimetypeExt(TypePNG, "png")
+	registerMimetypeExt(TypeGIF, "gif")
+	registerMimetypeExt(TypeBMP, "bmp")
+
+	registerMimetypeExt(TypeRawCanonCR2, "cr2")
+	registerMimetypeExt(TypeRawNikonNEF, "nef")
+	registerMimetypeExt(TypeRawRW2, "rw2")
+	registerMimetypeExt(TypeRawOlympusORF, "orf")
+	registerMimetypeExt(TypeRawSonyRaw, "raw")
+
+	registerMimetypeExt(Type3GPP, "3gp")
+	registerMimetypeExt(TypeAVI, "avi")
+	registerMimetypeExt(TypeFlashVideo, "flv")
+	registerMimetypeExt(TypeMatroska, "mkv")
+	registerMimetypeExt(TypeMP4, "mp4", "m4v")
+	registerMimetypeExt(TypeMPEG, "mpg", "mpeg")
+	registerMimetypeExt(TypeMPEG2TS, "mts", "m2ts")
+	registerMimetypeExt(TypeOGG, "ogv")
+	registerMimetypeExt(TypeQuickTime, "mov")
+	registerMimetypeExt(TypeWebM, "webm")
+	registerMimetypeExt(TypeWindowsMediaVideo, "wmv")
+}
+
 // Implements the sql.Scanner interface
 func (mimeType *Type) Scan(value interface{}) error {
 	// github.com/mattn/sqlite3 used to send strings, now it sends []byte
@@ -80,51 +111,23 @@ func (mimeType Type) Value() (driver.Value, error) {
 	return string(mimeType), nil
 }
 
+// Returns an extension for a mimetype, without a leading "."
 func (mimeType Type) DefaultExtension() string {
-	switch mimeType {
-	case TypeJPEG:
-		return "jpeg"
-	case TypePNG:
-		return "png"
-
-	case TypeRawCanonCR2:
-		return "cr2"
-	case TypeRawNikonNEF:
-		return "nef"
-	case TypeRawRW2:
-		return "rw2"
-	case TypeRawOlympusORF:
-		return "orf"
-	case TypeRawSonyRaw:
-		return "raw"
-
-	case Type3GPP:
-		return "3gp"
-	case TypeAVI:
-		return "avi"
-	case TypeFlashVideo:
-		return "flv"
-	case TypeMatroska:
-		return "mkv"
-	case TypeMP4:
-		return "mp4"
-	case TypeMPEG:
-		return "mpg"
-	case TypeMPEG2TS:
-		return "mts"
-	case TypeOGG:
-		return "ogv"
-	case TypeQuickTime:
-		return "mov"
-	case TypeWebM:
-		return "webm"
-	case TypeWindowsMediaVideo:
-		return "wmv"
-	default:
-		return ""
-	}
+	return mime2ext[mimeType]
 }
 
+// Returns the mimetype for an extension, which must start with "."
 func TypeByExtension(ext string) Type {
 	return Type(mime.TypeByExtension(ext))
+}
+
+// Returns true if ext is one of the hardcoded extensions in this module.
+// Does not look at the system's mime db.  Extension can optionally start with
+// "." and are not case-sensitive.
+func IsKnownExtension(ext string) bool {
+	if strings.HasPrefix(ext, ".") {
+		ext = ext[1:]
+	}
+	_, ok := ext2mime[strings.ToLower(ext)]
+	return ok
 }
