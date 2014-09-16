@@ -3,6 +3,7 @@ package mime
 import (
 	"database/sql/driver"
 	"fmt"
+	"log"
 	"mime"
 	"strings"
 )
@@ -41,15 +42,32 @@ var (
 	mime2ext map[Type]string = make(map[Type]string)
 )
 
-func registerMimetypeExt(mimeType Type, ext string) {
-	ext2mime[ext] = mimeType
+// Adds a mimetype and extension to reverse lookup maps, and registers the
+// extension with mime db.  Subsequent registration of (mimetype, extension)
+// will overwrite previous ones.  Multiple extensions may be passed, the
+// first one will be the default extension for that mimetype.
+func registerMimetypeExt(mimeType Type, ext string, extras ...string) {
+	if _, ok := mime2ext[mimeType]; ok {
+		log.Panicf("Mimetype %s already registered", mimeType)
+	}
+
+	ext = strings.ToLower(ext)
 	mime2ext[mimeType] = ext
+
+	registerExtraMimetypeExt(mimeType, ext)
+	for _, ext := range extras {
+		registerExtraMimetypeExt(mimeType, ext)
+	}
+}
+
+func registerExtraMimetypeExt(mimeType Type, ext string) {
+	ext = strings.ToLower(ext)
+	ext2mime[ext] = mimeType
 	mime.AddExtensionType("."+ext, string(mimeType))
 }
 
 func init() {
-	registerMimetypeExt(TypeJPEG, "jpeg")
-	registerMimetypeExt(TypeJPEG, "jpg")
+	registerMimetypeExt(TypeJPEG, "jpg", "jpeg")
 	registerMimetypeExt(TypePNG, "png")
 	registerMimetypeExt(TypeGIF, "gif")
 	registerMimetypeExt(TypeBMP, "bmp")
@@ -58,18 +76,15 @@ func init() {
 	registerMimetypeExt(TypeRawNikonNEF, "nef")
 	registerMimetypeExt(TypeRawRW2, "rw2")
 	registerMimetypeExt(TypeRawOlympusORF, "orf")
-	registerMimetypeExt(TypeRawSonyRaw, "arf")
+	registerMimetypeExt(TypeRawSonyRaw, "raw")
 
 	registerMimetypeExt(Type3GPP, "3gp")
 	registerMimetypeExt(TypeAVI, "avi")
 	registerMimetypeExt(TypeFlashVideo, "flv")
 	registerMimetypeExt(TypeMatroska, "mkv")
-	registerMimetypeExt(TypeMP4, "m4v")
-	registerMimetypeExt(TypeMP4, "mp4")
-	registerMimetypeExt(TypeMPEG, "mpeg")
-	registerMimetypeExt(TypeMPEG, "mpg")
-	registerMimetypeExt(TypeMPEG2TS, "m2ts")
-	registerMimetypeExt(TypeMPEG2TS, "mts")
+	registerMimetypeExt(TypeMP4, "mp4", "m4v")
+	registerMimetypeExt(TypeMPEG, "mpg", "mpeg")
+	registerMimetypeExt(TypeMPEG2TS, "mts", "m2ts")
 	registerMimetypeExt(TypeOGG, "ogv")
 	registerMimetypeExt(TypeQuickTime, "mov")
 	registerMimetypeExt(TypeWebM, "webm")
